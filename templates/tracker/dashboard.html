@@ -1,0 +1,87 @@
+{% extends "tracker/base.html" %}
+{% block title %}Dashboard — LabTracker{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+{% block topbar_actions %}
+  <a href="{% url 'asset_create' %}" class="btn btn-primary">
+    <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+    Add Asset
+  </a>
+{% endblock %}
+
+{% block content %}
+<div class="stats-grid">
+  <div class="stat-card">
+    <div class="stat-label">Total Assets</div>
+    <div class="stat-value" style="color: var(--text);">{{ total }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Available</div>
+    <div class="stat-value available">{{ available }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">In Use</div>
+    <div class="stat-value in_use">{{ in_use }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">In Repair</div>
+    <div class="stat-value repair">{{ repair }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Retired</div>
+    <div class="stat-value retired">{{ retired }}</div>
+  </div>
+</div>
+
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+  <!-- My Checkouts -->
+  <div class="card">
+    <div class="card-header">My Checkouts ({{ my_checkouts.count }})</div>
+    {% if my_checkouts %}
+      <table>
+        <thead><tr><th>Asset</th><th>Type</th><th>Action</th></tr></thead>
+        <tbody>
+        {% for asset in my_checkouts %}
+          <tr>
+            <td><a href="{% url 'asset_detail' asset.pk %}">{{ asset.name }}</a></td>
+            <td><span class="type-tag">{{ asset.get_asset_type_display }}</span></td>
+            <td>
+              <form method="post" action="{% url 'checkin' asset.pk %}" style="display:inline;">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-ghost btn-sm">Check In</button>
+              </form>
+            </td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <div class="empty-state">No assets currently checked out.</div>
+    {% endif %}
+  </div>
+
+  <!-- Recent Activity -->
+  <div class="card">
+    <div class="card-header">
+      Recent Activity
+      <a href="{% url 'audit_log' %}" style="font-size:11px; font-weight:400; color: var(--accent);">View all</a>
+    </div>
+    {% if recent_logs %}
+      <table>
+        <thead><tr><th>Asset</th><th>Action</th><th>By</th><th>When</th></tr></thead>
+        <tbody>
+        {% for log in recent_logs %}
+          <tr>
+            <td><a href="{% url 'asset_detail' log.asset.pk %}">{{ log.asset.name }}</a></td>
+            <td><span class="badge badge-{{ log.action }}">{{ log.get_action_display }}</span></td>
+            <td class="mono">{{ log.performed_by.username|default:"—" }}</td>
+            <td style="color: var(--text-muted); font-size: 12px;">{{ log.timestamp|timesince }} ago</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <div class="empty-state">No activity yet.</div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

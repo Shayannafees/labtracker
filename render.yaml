@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: labtracker
+    env: python
+    buildCommand: "pip install -r requirements.txt && python manage.py collectstatic --noinput && python manage.py migrate"
+    startCommand: "gunicorn labtracker.wsgi"
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DEBUG
+        value: False
+      - key: ALLOWED_HOSTS
+        value: your-app-name.onrender.com
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: DATABASE_URL
+        fromDatabase:
+          name: labtracker-db
+          property: connectionString
+
+databases:
+  - name: labtracker-db
+    plan: free

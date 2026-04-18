@@ -1,0 +1,184 @@
+{% extends "tracker/base.html" %}
+{% block title %}{{ asset.name }} — LabTracker{% endblock %}
+{% block page_title %}{{ asset.name }}{% endblock %}
+{% block topbar_actions %}
+  <a href="{% url 'asset_edit' asset.pk %}" class="btn btn-ghost">Edit</a>
+  {% if asset.status == 'available' %}
+    <form method="post" action="{% url 'checkout' asset.pk %}" style="display:inline;">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-primary">Check Out</button>
+    </form>
+  {% elif asset.checked_out_by == request.user or request.user.is_staff %}
+    <form method="post" action="{% url 'checkin' asset.pk %}" style="display:inline;">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-ghost">Check In</button>
+    </form>
+  {% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="detail-grid">
+  <!-- Asset Info -->
+  <div class="card">
+    <div class="card-header">Asset Details</div>
+    <div class="card-body">
+      <div class="info-row">
+        <span class="info-label">Status</span>
+        <span class="info-value"><span class="badge badge-{{ asset.status }}">{{ asset.get_status_display }}</span></span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Type</span>
+        <span class="info-value"><span class="type-tag">{{ asset.get_asset_type_display }}</span></span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Asset Tag</span>
+        <span class="info-value">{{ asset.asset_tag|default:"—" }}</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Serial Number</span>
+        <span class="info-value">{{ asset.serial_number|default:"—" }}</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Location</span>
+        <span class="info-value">{{ asset.location|default:"—" }}</span>
+      </div>
+      {% if asset.description %}
+      <div class="info-row">
+        <span class="info-label">Description</span>
+        <span class="info-value" style="font-family: var(--font-sans); font-size: 13px;">{{ asset.description }}</span>
+      </div>
+      {% endif %}
+      {% if asset.checked_out_by %}
+      <div class="info-row">
+        <span class="info-label">Checked Out By</span>
+        <span class="info-value">{{ asset.checked_out_by.get_full_name|default:asset.checked_out_by.username }}</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Since</span>
+        <span class="info-value">{{ asset.checked_out_at|date:"M d, Y H:i" }}</span>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Move Asset -->
+  <div style="display: flex; flex-direction: column; gap: 16px;">
+    <div class="card">
+      <div class="card-header">Move Asset</div>
+      <div class="card-body">
+        <form method="post" action="{% url 'move_asset' asset.pk %}" style="display:flex; gap:8px;">
+          {% csrf_token %}
+          <input type="text" name="location" value="{{ asset.location }}"
+                 placeholder="New location (e.g. Lab B, Rack 3)"
+                 style="flex:1; background: var(--surface2); border: 1px solid var(--border); color: var(--text); padding: 8px 12px; border-radius: 6px; font-size: 13px; outline: none;">
+          <button type="submit" class="btn btn-ghost">Move</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Attach Child Asset -->
+    <div class="card">
+      <div class="card-header">Attach Asset</div>
+      <div class="card-body">
+        <form method="post" action="{% url 'attach_asset' asset.pk %}" style="display:flex; gap:8px; flex-wrap: wrap;">
+          {% csrf_token %}
+          <select name="child_id" style="flex:1; background: var(--surface2); border: 1px solid var(--border); color: var(--text); padding: 8px 12px; border-radius: 6px; font-size: 13px; outline: none; min-width: 160px;">
+            {% for a in attach_form.fields.child_id.choices %}
+              <option value="{{ a.0 }}">{{ a.1 }}</option>
+            {% endfor %}
+          </select>
+          <button type="submit" class="btn btn-ghost">Attach</button>
+        </form>
+        <p style="font-size: 11px; color: var(--text-muted); margin-top: 6px;">
+          Attach a chip, board, or sub-asset to this {{ asset.get_asset_type_display|lower }}.
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Relationships -->
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px;">
+  <div class="card">
+    <div class="card-header">Attached To (Parent)</div>
+    {% if parents %}
+      <table>
+        <thead><tr><th>Asset</th><th>Type</th><th>Since</th><th></th></tr></thead>
+        <tbody>
+        {% for rel in parents %}
+          <tr>
+            <td><a href="{% url 'asset_detail' rel.parent.pk %}">{{ rel.parent.name }}</a></td>
+            <td><span class="type-tag">{{ rel.parent.get_asset_type_display }}</span></td>
+            <td style="color:var(--text-muted); font-size:12px;">{{ rel.attached_at|date:"M d" }}</td>
+            <td>
+              <form method="post" action="{% url 'detach_asset' rel.pk %}">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-danger btn-sm">Detach</button>
+              </form>
+            </td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <div class="empty-state">Not attached to any parent asset.</div>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <div class="card-header">Children ({{ children.count }})</div>
+    {% if children %}
+      <table>
+        <thead><tr><th>Asset</th><th>Type</th><th>Since</th><th></th></tr></thead>
+        <tbody>
+        {% for rel in children %}
+          <tr>
+            <td><a href="{% url 'asset_detail' rel.child.pk %}">{{ rel.child.name }}</a></td>
+            <td><span class="type-tag">{{ rel.child.get_asset_type_display }}</span></td>
+            <td style="color:var(--text-muted); font-size:12px;">{{ rel.attached_at|date:"M d" }}</td>
+            <td>
+              <form method="post" action="{% url 'detach_asset' rel.pk %}">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-danger btn-sm">Detach</button>
+              </form>
+            </td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <div class="empty-state">No child assets attached.</div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Audit Log -->
+<div class="card">
+  <div class="card-header">
+    Audit History
+    <a href="{% url 'audit_log' %}?asset={{ asset.name }}" style="font-size:11px; font-weight:400; color: var(--accent);">Full log</a>
+  </div>
+  {% if logs %}
+    <table>
+      <thead><tr><th>Action</th><th>By</th><th>When</th><th>Details</th></tr></thead>
+      <tbody>
+      {% for log in logs %}
+        <tr>
+          <td><span class="badge badge-{{ log.action }}">{{ log.get_action_display }}</span></td>
+          <td class="mono">{{ log.performed_by.username|default:"system" }}</td>
+          <td style="color:var(--text-muted); font-size:12px;">{{ log.timestamp|date:"M d, Y H:i" }}</td>
+          <td style="color:var(--text-muted); font-size:12px;">
+            {% if log.previous_value and log.new_value %}{{ log.previous_value }} → {{ log.new_value }}
+            {% elif log.new_value %}{{ log.new_value }}
+            {% elif log.notes %}{{ log.notes }}
+            {% else %}—{% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <div class="empty-state">No history yet.</div>
+  {% endif %}
+</div>
+{% endblock %}

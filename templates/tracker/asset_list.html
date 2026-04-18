@@ -1,0 +1,77 @@
+{% extends "tracker/base.html" %}
+{% block title %}Assets — LabTracker{% endblock %}
+{% block page_title %}Assets{% endblock %}
+{% block topbar_actions %}
+  <a href="{% url 'asset_create' %}" class="btn btn-primary">
+    <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+    Add Asset
+  </a>
+{% endblock %}
+
+{% block content %}
+<form method="get" class="search-bar">
+  <input type="text" name="q" value="{{ query }}" placeholder="Search by name, tag, location, serial…">
+  <select name="type">
+    <option value="">All Types</option>
+    {% for val, label in type_choices %}
+      <option value="{{ val }}" {% if selected_type == val %}selected{% endif %}>{{ label }}</option>
+    {% endfor %}
+  </select>
+  <select name="status">
+    <option value="">All Statuses</option>
+    {% for val, label in status_choices %}
+      <option value="{{ val }}" {% if selected_status == val %}selected{% endif %}>{{ label }}</option>
+    {% endfor %}
+  </select>
+  <button type="submit" class="btn btn-ghost">Search</button>
+  {% if query or selected_type or selected_status %}
+    <a href="{% url 'asset_list' %}" class="btn btn-ghost">Clear</a>
+  {% endif %}
+</form>
+
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Tag</th>
+        <th>Type</th>
+        <th>Status</th>
+        <th>Location</th>
+        <th>Checked Out By</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for asset in assets %}
+      <tr>
+        <td><a href="{% url 'asset_detail' asset.pk %}">{{ asset.name }}</a></td>
+        <td class="mono">{{ asset.asset_tag|default:"—" }}</td>
+        <td><span class="type-tag">{{ asset.get_asset_type_display }}</span></td>
+        <td><span class="badge badge-{{ asset.status }}">{{ asset.get_status_display }}</span></td>
+        <td style="color: var(--text-muted);">{{ asset.location|default:"—" }}</td>
+        <td class="mono">{{ asset.checked_out_by.username|default:"—" }}</td>
+        <td>
+          <div class="action-bar">
+            <a href="{% url 'asset_detail' asset.pk %}" class="btn btn-ghost btn-sm">View</a>
+            {% if asset.status == 'available' %}
+              <form method="post" action="{% url 'checkout' asset.pk %}" style="display:inline;">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-primary btn-sm">Check Out</button>
+              </form>
+            {% elif asset.checked_out_by == request.user %}
+              <form method="post" action="{% url 'checkin' asset.pk %}" style="display:inline;">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-ghost btn-sm">Check In</button>
+              </form>
+            {% endif %}
+          </div>
+        </td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="7"><div class="empty-state">No assets found.</div></td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
